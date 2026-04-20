@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/moiz045/backend-project#readme",
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "prettier": "^3.8.3"
   }
 }
