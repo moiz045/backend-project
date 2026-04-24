@@ -185,3 +185,40 @@ export const changePassword = asyncHandler(async (req, res) => {
   await user.save({ validateBeforeSave: true });
   res.status(200).json(new ApiResponse(200, "Password changed successfully"));
 });
+
+export const getUserProfile = asyncHandler(async (req, res) => {
+  res
+    .status(200)
+    .json(
+      new ApiResponse(200, "User profile retrieved successfully", req.user)
+    );
+});
+
+export const updateUserProfile = asyncHandler(async (req, res) => {
+  const { username, email, fullname } = req.body;
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: { username, email, fullname } },
+    { new: true }
+  ).select("-password -refreshToken");
+  res
+    .status(200)
+    .json(new ApiResponse(200, "User profile updated successfully", user));
+});
+
+export const changeAvatar = asyncHandler(async (req, res) => {
+  configureCloudinary();
+  const avatarLocalPath = req.file?.path;
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "Avatar image is required");
+  }
+  const avatar = await uploadToCloudinary(avatarLocalPath);
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: { avatar: avatar.url } },
+    { new: true }
+  ).select("password");
+  res
+    .status(200)
+    .json(new ApiResponse(200, "Avatar updated successfully", user));
+});
