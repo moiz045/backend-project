@@ -6,6 +6,7 @@ import {
   configureCloudinary,
 } from "../utils/fileUpload.js";
 import ApiResponse from "../utils/ApiResponse.js";
+import mongoose from "mongoose";
 
 const getAccessAndRefreshTokens = async (userId) => {
   const user = await User.findById(userId);
@@ -221,4 +222,139 @@ export const changeAvatar = asyncHandler(async (req, res) => {
   res
     .status(200)
     .json(new ApiResponse(200, "Avatar updated successfully", user));
+});
+
+export const changeCoverImage = asyncHandler(async (req, res) => {
+  configureCloudinary();
+  const coverImageLocalPath = req.file?.path;
+  if (!coverImageLocalPath) {
+    throw new ApiError(400, "Cover image is required");
+  }
+  const coverImage = await uploadToCloudinary(coverImageLocalPath);
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: { coverImage: coverImage.url } },
+    { new: true }
+  ).select("password");
+  res
+    .status(200)
+    .json(new ApiResponse(200, "Cover image updated successfully", user));
+});
+
+export const getUserChannelProfile = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+  if (!username?.trim()) {
+    throw new ApiError(400, "Username is missing");
+  }
+
+  const channel = await User.aggregate([
+    { $match: { username: username.toLowerCase() } },
+    {
+      $lookup: {
+        from: "subscribers",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+
+    {
+      $lookup: {
+        from: "subscribers",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+
+    {
+      $addFields: {
+        subscriberCount: { $size: "$subscribers" },
+        channelSubscribedToCOunt: { $size: "$subscribedTo" },
+        isSubscribed: {
+          $cond: [
+            { $in: [req.user._id, "$subscribers.subscriber"] },
+            true,
+            false,
+          ],
+        },
+      },
+    },
+
+    {
+      $project: {
+        username: 1,
+        fullname: 1,
+        avatar: 1,
+        coverImage: 1,
+        subscriberCount: 1,
+        channelSubscribedToCOunt: 1,
+        isSubscribed: 1,
+        email: 1,
+      },
+    },
+  ]);
+
+  console.log(channel);
+
+  if (!channel || channel.length === 0) {
+    throw new ApiError(404, "Channel not found");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, "Channel profile retrieved successfully", channel[0])
+    );
+});
+
+export const getWatchHistory = asyncHandler(async (req, res) => {
+  const user = await User.aggregate([
+    { $match: { _id: mongoose.Types.ObjectId(req.user._id) } },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    username: 1,
+                    fullname: 1,
+                    avatar: 1,
+                  },
+                },
+                {
+                  owner: {
+                    $first: "$owner",
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ]);
+  if (!user || user.length === 0) {
+    throw new ApiError(404, "User not found");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "Watch history retrieved successfully",
+        user[0].watchHistory
+      )
+    );
 });
