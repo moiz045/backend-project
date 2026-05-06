@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import mongoose from "mongoose";
 import { connectDB } from "./config/db.config.js";
 import router from "./routes/user.routes.js";
+import videoRouter from "./routes/video.routes.js";
 
 dotenv.config({
   path: "./.env",
@@ -19,6 +20,7 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(cookieParser());
 
 app.use("/api/v1/users", router);
+app.use("/api/v2/videos", videoRouter);
 app.get("/", (req, res) => {
   res.send("HELLO FROM EXPRESS 🚀");
 });
