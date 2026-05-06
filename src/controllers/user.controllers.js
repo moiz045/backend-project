@@ -112,7 +112,7 @@ export const logoutUser = asyncHandler(async (req, res) => {
   const user = await User.findByIdAndUpdate(
     userId,
     {
-      $set: { refreshToken: undefined },
+      $unset: { refreshToken: 1 },
     },
     { new: true }
   );
@@ -310,7 +310,7 @@ export const getUserChannelProfile = asyncHandler(async (req, res) => {
 
 export const getWatchHistory = asyncHandler(async (req, res) => {
   const user = await User.aggregate([
-    { $match: { _id: mongoose.Types.ObjectId(req.user._id) } },
+    { $match: { _id: new mongoose.Types.ObjectId(req.user._id) } },
     {
       $lookup: {
         from: "videos",
@@ -333,8 +333,8 @@ export const getWatchHistory = asyncHandler(async (req, res) => {
                   },
                 },
                 {
-                  owner: {
-                    $first: "$owner",
+                  $addFields: {
+                    owner: { $first: "$owner" },
                   },
                 },
               ],
