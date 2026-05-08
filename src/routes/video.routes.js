@@ -7,10 +7,16 @@ import {
   updateVideo,
   getVideoById,
   getAllVideos,
+  incrementVideoViews,
 } from "../controllers/video.controllers.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
 const router = Router();
+
+router.route("/").get(getAllVideos);
+router.route("/:videoId").get(getVideoById);
+router.route("/:videoId/view").patch(incrementVideoViews);
+
 router.use(authenticateUser);
 
 router.route("/publish").post(
@@ -20,10 +26,8 @@ router.route("/publish").post(
   ]),
   publishAVideo
 );
-router.route("/").get(getAllVideos);
 router
   .route("/:videoId")
-  .get(getVideoById)
   .delete(deleteVideo)
   .patch(upload.single("thumbnail"), updateVideo);
 

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { authenticateUser } from "../middlewares/auth.middleware.js";
 import {
   getVideoLikes,
+  getLikedVideos,
   toggleTweetLike,
   toggleCommentLike,
   toggleVideoLike,
@@ -13,6 +14,7 @@ router.use(authenticateUser);
 router.route("/toggle/v/:videoId").post(toggleVideoLike);
 router.route("/toggle/c/:commentId").post(toggleCommentLike);
 router.route("/toggle/t/:tweetId").post(toggleTweetLike);
-router.route("/videos").get(getVideoLikes);
+router.route("/videos").get(getLikedVideos);
+router.route("/videos/:videoId").get(getVideoLikes);
 
 export default router;

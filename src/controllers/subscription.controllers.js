@@ -38,22 +38,46 @@ export const toggleSubscription = asyncHandler(async (req, res) => {
   if (subscriptionRecord) {
     await subscriptionRecord.deleteOne();
 
-    return res
-      .status(200)
-      .json(new ApiResponse(200, {}, "Subscription removed successfully"));
+    // Decrement stored count (floor at 0)
+    await User.findByIdAndUpdate(channelId, {
+      $inc: { subscriberCount: -1 },
+    });
+
+    // Recompute accurate count from collection
+    const subscriberCount = await Subscription.countDocuments({
+      channel: channelId,
+    });
+
+    return res.status(200).json(
+      new ApiResponse(200, "Subscription removed successfully", {
+        isSubscribed: false,
+        subscriberCount,
+      })
+    );
   }
 
   // If subscription does not exist, add it
-  const newSubscription = await Subscription.create({
+  await Subscription.create({
     channel: channelId,
     subscriber: req.user._id,
-  }).select("-__v");
+  });
 
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(200, newSubscription, "Subscription added successfully")
-    );
+  // Increment stored count
+  await User.findByIdAndUpdate(channelId, {
+    $inc: { subscriberCount: 1 },
+  });
+
+  // Recompute accurate count from collection
+  const subscriberCount = await Subscription.countDocuments({
+    channel: channelId,
+  });
+
+  return res.status(200).json(
+    new ApiResponse(200, "Subscription added successfully", {
+      isSubscribed: true,
+      subscriberCount,
+    })
+  );
 });
 
 export const getSubscribedChannels = asyncHandler(async (req, res) => {
@@ -70,11 +94,8 @@ export const getSubscribedChannels = asyncHandler(async (req, res) => {
   }
 
   const channelSubscribed = await Subscription.find({
-    subscriber: channelId,
-  }).populate({
-    path: "channel",
-    select: "-refreshToken -password",
-  });
+    subscriber: req.user._id,
+  }).populate("channel", "-refreshToken -password");
 
   return res
     .status(200)
@@ -111,5 +132,24 @@ export const getUserChannelSubscribers = asyncHandler(async (req, res) => {
     .status(200)
     .json(
       new ApiResponse(200, subscribers, "Subscriber list fetched successfully")
+    );
+});
+
+export const checkSubscription = asyncHandler(async (req, res) => {
+  const { channelId } = req.params;
+
+  if (!isValidObjectId(channelId)) {
+    throw new ApiError(400, "Invalid channelId");
+  }
+
+  const isSubscribed = !!(await Subscription.findOne({
+    channel: channelId,
+    subscriber: req.user._id,
+  }));
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, { isSubscribed }, "Subscription status fetched")
     );
 });

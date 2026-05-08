@@ -11,6 +11,9 @@ import {
   changeCoverImage,
   getUserChannelProfile,
   getWatchHistory,
+  addToWatchHistory,
+  toggleWatchLater,
+  getWatchLater,
 } from "../controllers/user.controllers.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { authenticateUser } from "../middlewares/auth.middleware.js";
@@ -40,5 +43,10 @@ router
 
 router.route("/channel/:username").get(authenticateUser, getUserChannelProfile);
 router.route("/watch-history").get(authenticateUser, getWatchHistory);
+router
+  .route("/watch-history/:videoId")
+  .post(authenticateUser, addToWatchHistory);
+router.route("/watch-later").get(authenticateUser, getWatchLater);
+router.route("/watch-later/:videoId").patch(authenticateUser, toggleWatchLater);
 
 export default router;

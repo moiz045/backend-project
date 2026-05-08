@@ -1,5 +1,5 @@
 import asyncHandler from "../utils/asyncHandler.js";
-import { ApiError } from "../utils/APIError.js";
+import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.models.js";
 import {
   uploadToCloudinary,
@@ -7,6 +7,7 @@ import {
 } from "../utils/fileUpload.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
 
 const getAccessAndRefreshTokens = async (userId) => {
   const user = await User.findById(userId);
@@ -79,15 +80,15 @@ export const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
   if (!email && !password) {
-    throw new ApiError("Email or Password  is required", 400);
+    throw new ApiError(400, "Email or Password  is required");
   }
   const user = await User.findOne({ $or: [{ email }] });
   if (!user) {
-    throw new ApiError("User not found", 404);
+    throw new ApiError(404, "User not found");
   }
   const isPasswordValid = await user.comparePassword(password);
   if (!isPasswordValid) {
-    throw new ApiError("Invalid password", 401);
+    throw new ApiError(401, "Invalid password");
   }
 
   const tokens = await getAccessAndRefreshTokens(user._id);
@@ -117,7 +118,7 @@ export const logoutUser = asyncHandler(async (req, res) => {
     { new: true }
   );
   if (!user) {
-    throw new ApiError("User not found", 404);
+    throw new ApiError(404, "User not found");
   }
 
   const options = {
@@ -218,7 +219,7 @@ export const changeAvatar = asyncHandler(async (req, res) => {
     req.user._id,
     { $set: { avatar: avatar.url } },
     { new: true }
-  ).select("password");
+  ).select("-password -refreshToken");
   res
     .status(200)
     .json(new ApiResponse(200, "Avatar updated successfully", user));
@@ -235,7 +236,7 @@ export const changeCoverImage = asyncHandler(async (req, res) => {
     req.user._id,
     { $set: { coverImage: coverImage.url } },
     { new: true }
-  ).select("password");
+  ).select("-password -refreshToken");
   res
     .status(200)
     .json(new ApiResponse(200, "Cover image updated successfully", user));
@@ -356,5 +357,64 @@ export const getWatchHistory = asyncHandler(async (req, res) => {
         "Watch history retrieved successfully",
         user[0].watchHistory
       )
+    );
+});
+
+export const addToWatchHistory = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  if (!mongoose.isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid Video ID");
+  }
+  // Remove if exists then prepend so newest is always first, no duplicates
+  await User.findByIdAndUpdate(req.user._id, {
+    $pull: { watchHistory: new mongoose.Types.ObjectId(videoId) },
+  });
+  await User.findByIdAndUpdate(req.user._id, {
+    $push: {
+      watchHistory: {
+        $each: [new mongoose.Types.ObjectId(videoId)],
+        $position: 0,
+      },
+    },
+  });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Added to watch history", {}));
+});
+
+export const toggleWatchLater = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  if (!mongoose.isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid Video ID");
+  }
+  const user = await User.findById(req.user._id);
+  if (!user) throw new ApiError(404, "User not found");
+
+  const vid = new mongoose.Types.ObjectId(videoId);
+  const isSaved = user.watchLater.some((id) => id.equals(vid));
+
+  if (isSaved) {
+    user.watchLater.pull(vid);
+  } else {
+    user.watchLater.push(vid);
+  }
+  await user.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Watch Later toggled", { saved: !isSaved }));
+});
+
+export const getWatchLater = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id)
+    .populate({
+      path: "watchLater",
+      populate: { path: "owner", select: "fullname username avatar" },
+    })
+    .select("watchLater");
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, "Watch Later retrieved", user?.watchLater ?? [])
     );
 });

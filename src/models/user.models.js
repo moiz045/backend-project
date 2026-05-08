@@ -31,6 +31,19 @@ const userSchema = new Schema(
       },
     ],
 
+    watchLater: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Video",
+      },
+    ],
+
+    subscriberCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     password: {
       type: String,
       required: [true, "Password is required"],
@@ -40,7 +53,7 @@ const userSchema = new Schema(
 );
 
 userSchema.pre("save", async function () {
-  if (!this.password) return;
+  if (!this.isModified("password")) return;
   this.password = await bcrypt.hash(this.password, 10);
 });
 

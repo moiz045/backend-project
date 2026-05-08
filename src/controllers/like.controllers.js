@@ -22,7 +22,7 @@ export const toggleVideoLike = asyncHandler(async (req, res) => {
 
   const existingLike = await Like.findOne({
     video: videoId,
-    user: req.user._id,
+    likedBy: req.user._id,
   });
 
   let liked = false;
@@ -32,7 +32,7 @@ export const toggleVideoLike = asyncHandler(async (req, res) => {
   } else {
     await Like.create({
       video: videoId,
-      user: req.user._id,
+      likedBy: req.user._id,
     });
 
     liked = true;
@@ -67,7 +67,7 @@ export const toggleCommentLike = asyncHandler(async (req, res) => {
   }
   const existingLike = await Like.findOne({
     comment: commentId,
-    user: req.user._id,
+    likedBy: req.user._id,
   });
 
   let liked = false;
@@ -77,7 +77,7 @@ export const toggleCommentLike = asyncHandler(async (req, res) => {
   } else {
     await Like.create({
       comment: commentId,
-      user: req.user._id,
+      likedBy: req.user._id,
     });
     liked = true;
   }
@@ -113,7 +113,7 @@ export const toggleTweetLike = asyncHandler(async (req, res) => {
 
   const existingLike = await Like.findOne({
     tweet: tweetId,
-    user: req.user._id,
+    likedBy: req.user._id,
   });
 
   let liked = false;
@@ -122,7 +122,7 @@ export const toggleTweetLike = asyncHandler(async (req, res) => {
   } else {
     await Like.create({
       tweet: tweetId,
-      user: req.user._id,
+      likedBy: req.user._id,
     });
     liked = true;
   }
@@ -157,13 +157,39 @@ export const getVideoLikes = asyncHandler(async (req, res) => {
   const likesCount = await Like.countDocuments({
     video: videoId,
   });
+  const liked = !!(await Like.findOne({
+    video: videoId,
+    likedBy: req.user._id,
+  }));
   return res.status(200).json(
     new ApiResponse(
       200,
       {
         likesCount,
+        liked,
       },
       "Likes count fetched successfully"
     )
   );
+});
+
+export const getLikedVideos = asyncHandler(async (req, res) => {
+  const likedVideos = await Like.find({
+    likedBy: req.user._id,
+    video: { $exists: true, $ne: null },
+  })
+    .populate({
+      path: "video",
+      populate: {
+        path: "owner",
+        select: "fullname username avatar",
+      },
+    })
+    .sort({ createdAt: -1 });
+
+  const videos = likedVideos.map((entry) => entry.video).filter(Boolean);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Liked videos fetched successfully", videos));
 });
